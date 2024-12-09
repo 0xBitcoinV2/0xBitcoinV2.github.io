@@ -14,6 +14,7 @@
 //USE value 7979960 for everything
 var ethblockstart = 29444543
 var adjustAverageRewardTimeGraph = 8
+var searchPoints2 = 120
 class contractValueOverTime {
   constructor(eth, contract_address, storage_index, descriptor) {
     /* how long to wait between sequential requests */
@@ -46,12 +47,14 @@ class contractValueOverTime {
     log('query_count', query_count);
 
     // check localStorage to see if we have any cached data
-    var storage_data = null//JSON.parse(localStorage.getItem(this.descriptor));
+   // var storage_data = null//JSON.parse(localStorage.getItem(this.descriptor));
+	var storage_data = JSON.parse(localStorage.getItem(this.descriptor));
 
     var last_storage_block = null;   
     if (storage_data != null) {
       log('read in', storage_data.length, 'cached elements for', this.descriptor);
       last_storage_block = storage_data[storage_data.length - 1][0];
+	 log("LAST BLOCK: ", last_storage_block, " for ", this.descriptor);
     }
 
     // get a data point for the current time (ie. end_block_num), then get remaining data points
@@ -73,8 +76,14 @@ class contractValueOverTime {
       }
       if (use_storage) {
         let element = storage_data.pop();
-        this.states.push([element[0], new Eth.BN(element[1], 16), '']);
-        this.expected_state_length++;
+		  if (element && element[0] !== undefined) {
+    			this.states.push([element[0], new Eth.BN(element[1], 16), '']);
+       			this.expected_state_length++;
+			} else {
+				console.error('element is undefined or does not contain the expected properties:', element,"  Block_num: ",block_num );
+				this.addValueAtEthBlock(block_num);
+			}
+
       } else { 
 	log('block_num before addValueAtEthBlock', block_num);
      
@@ -167,9 +176,13 @@ console.log("IS?23 : ",eth_block_num)
     // }
 
   }
+
   areAllValuesLoaded() {
     //log('cv_obj', this.storage_index.padStart(2), ': values loaded: ', this.states.length, '/', this.expected_state_length);
-    return this.expected_state_length == this.states.length;
+	  log("Expected: ",this.expected_state_length ," vs cur Length: ", this.states.length);
+	  log("searchPoints2: ", searchPoints2);
+	  //try making it 120 values only
+    return searchPoints2 == this.states.length;
   }
   async waitUntilLoaded() {
     while (!this.areAllValuesLoaded()) {
@@ -286,12 +299,30 @@ console.log("IS?23 : ",eth_block_num)
 
 
 
-function generateHashrateAndBlocktimeGraph(eth, target_cv_obj, era_cv_obj, tokens_minted_cv_obj) {
+function generateHashrateAndBlocktimeGraph(eth, target_cv_obj, era_cv_obj, price_cv_obj, price_cv_obj2, price_cv_obj3, price_cv_obj4, tokens_minted_cv_obj) {
   el('#difficultystats').innerHTML = '<canvas id="chart-hashrate-difficulty" width="4rem" height="2rem"></canvas>';
   el('#blocktimestats').innerHTML =  '<canvas id="chart-rewardtime" width="4rem" height="2rem"></canvas>';
+  el('#priceOverTimestats').innerHTML =  '<canvas id="chart-pricetime" width="4rem" height="2rem"></canvas>';
+  el('#avgRevenue').innerHTML =  '<canvas id="chart-AvgRevenue" width="4rem" height="2rem"></canvas>';
+	
+	
+	
   var target_values = target_cv_obj.getValues;
+		
+	
+	var target_values_all =  target_values;
+	
+	
+	
+	
+	
+	
   var era_values = era_cv_obj.getValues;
   var tokens_minted_values = tokens_minted_cv_obj.getValues;
+  var tokens_price_values = price_cv_obj.getValues;
+  var tokens_price_values2 = price_cv_obj2.getValues;
+  var tokens_price_values3 = price_cv_obj3.getValues;
+  var tokens_price_values4 = price_cv_obj4.getValues;
 
   function convertValuesToChartData(values, value_mod_function) {
     var chart_data = []
@@ -481,10 +512,141 @@ console.log("CB" , current_eth_block)
 
   var difficulty_data = convertValuesToChartData(target_values, 
                                                  (x)=>{return _MAXIMUM_TARGET_BN.div(x)});
+  var ALL_difficulty_data = convertValuesToChartData(target_values, 
+                                                 (x)=>{return _MAXIMUM_TARGET_BN.div(x)});
   var era_data = convertValuesToChartData(era_values);
 
   var total_supply_data = convertValuesToChartData(tokens_minted_values, 
                                                    (x)=>{return x * 1 / 10**18});
+
+
+  var total_price_data = convertValuesToChartData(tokens_price_values, 
+                                                   (x)=>{return x  * 1 / 10**18 });
+                                                   
+  var total_price_data2 = convertValuesToChartData(tokens_price_values2, 
+                                                   (x)=>{return x  * 1 / 10**18 });
+  var total_price_data3 = convertValuesToChartData(tokens_price_values3, 
+                                                   (x)=>{return x * 1/10**6 });
+  var total_price_data4 = convertValuesToChartData(tokens_price_values4, 
+                                                   (x)=>{return x * 1/ 10**18 });
+  console.log("TTTT TOTAL PRICE DATA : ", total_price_data4);
+	
+	
+	  let resultffffff = [];
+  let previousValue = null;
+
+  for (let i = 0; i < difficulty_data.length; i++) {
+    const currentValue = difficulty_data[i].y.toString();
+    const nextValue = i + 1 < difficulty_data.length ? difficulty_data[i + 1].y.toString() : null;
+
+    // Add the first occurrence
+    if (previousValue !== currentValue) {
+      resultffffff.push(difficulty_data[i]);
+      previousValue = currentValue;
+    }
+
+    // Add the last occurrence
+    if (currentValue !== nextValue && nextValue !== null) {
+      resultffffff.push(difficulty_data[i]);
+    }
+  }
+
+  // Always add the last element if it's not already included
+  if (resultffffff[resultffffff.length - 1] !== difficulty_data[difficulty_data.length - 1]) {
+    resultffffff.push(difficulty_data[difficulty_data.length - 1]);
+  }
+	console.log("resultffffff: ", resultffffff);
+	
+	
+  let result = total_price_data3.map((item, index) => {
+        if (total_price_data4[index].y === 0) {
+            // Handle division by zero if necessary
+            console.error("Division by zero at index " + index);
+            return null; // or handle it another way, depending on your needs
+        }
+        return {
+            x: item.x, // You can choose to retain the x value or modify this structure
+            y: item.y / total_price_data4[index].y
+        };
+    });
+    
+	  
+	  
+	  const scaleFactor = 100000;
+
+    let resultGraph = total_price_data.map((item, index) => {
+        if (total_price_data2[index].y === 0) {
+            // Handle division by zero if necessary
+            console.error("Division by zero at index " + index);
+            return null; // or handle it another way, depending on your needs
+        }
+        return {
+            x: item.x, // You can choose to retain the x value or modify this structure
+            y: 1 / (item.y / total_price_data2[index].y)*scaleFactor
+        };
+    });
+      let result2 = total_price_data.map((item, index) => {
+        if (total_price_data2[index].y === 0) {
+            // Handle division by zero if necessary
+            console.error("Division by zero at index " + index);
+            return null; // or handle it another way, depending on your needs
+        }
+        return {
+            x: item.x, // You can choose to retain the x value or modify this structure
+            y: item.y / total_price_data2[index].y
+        };
+    });
+    
+      let avgPriceAtTime = result.map((item, index) => {
+        if (result2[index].y === 0) {
+            // Handle division by zero if necessary
+            console.error("Division by zero at index " + index);
+            return null; // or handle it another way, depending on your needs
+        }
+        return {
+            x: item.x, // You can choose to retain the x value or modify this structure
+            y: item.y / result2[index].y
+        };
+    });
+	
+	  
+	let avgRevenue = [];
+let lengthDifference = Math.abs(avgPriceAtTime.length - ALL_difficulty_data.length);
+
+// Starting from the end of both arrays
+for (let i = 0; i < Math.min(avgPriceAtTime.length, ALL_difficulty_data.length); i++) {
+    let avgPriceIndex = avgPriceAtTime.length - 1 - i;
+    let difficultyIndex = ALL_difficulty_data.length - 1 - i;
+
+    if (avgPriceAtTime[avgPriceIndex].y === 0) {
+        // Handle division by zero if necessary
+        console.error("Division by zero at index " + avgPriceIndex);
+        avgRevenue.push(null); // or handle it another way, depending on your needs
+    } else {
+        avgRevenue.push({
+            x: ALL_difficulty_data[difficultyIndex].x, // You can choose to retain the x value or modify this structure
+            y: (31000000000 * 4320000 * 8 / (10 * ALL_difficulty_data[difficultyIndex].y * 2**22)) * avgPriceAtTime[avgPriceIndex].y
+        });
+    }
+}
+
+// Reverse the result array to match the original order if needed
+avgRevenue.reverse();
+
+console.log("avgRevenue TEST: ", avgRevenue);
+  console.log("TTTT TOTAL PRICE DATA222 : ", result);
+  console.log("TTTT TOTAL PRICE DATA3333 : ", result2);
+  console.log("Actual Price in USD data : ", avgPriceAtTime);
+	
+console.log("Revenue difficulty data: ", ALL_difficulty_data);
+console.log("Revenue price at time: ", avgPriceAtTime);
+  var largest$Array = avgPriceAtTime.reduce((max, cur) => Math.max(max, cur.y), avgPriceAtTime[0].y);
+  var largestETHArray = resultGraph.reduce((max, cur) => Math.max(max, cur.y), resultGraph[0].y);
+  largest$Array = largest$Array * 1.05;
+  largestETHArray = largestETHArray * 1.05;
+
+  console.log("largest number: ", largest$Array);
+  console.log("largest ETH number: ", largestETHArray);
   var eras_per_block_data = getErasPerBlockFromEraData(era_values);
 
   var hashrate_data = getHashrateDataFromDifficultyAndErasPerBlockData(difficulty_data, eras_per_block_data);
@@ -506,7 +668,6 @@ if(eras_per_block_data[i].x > ethblockstart){
   /* figure out how to scale chart: difficulty can be too high or too low */
   var max_difficulty_value = 0
   for (var i = 0; i < difficulty_data.length; i += 1) {
-var max_difficulty_value = 0
 try{
     if (difficulty_data[i].y.toNumber() > max_difficulty_value) {
       max_difficulty_value = difficulty_data[i].y.toNumber();
@@ -517,7 +678,7 @@ try{
   var max_hashrate_value = 0
 
   for (var i = 0; i < hashrate_data.length; i += 1) {
-	console.log("max_hashrate_value22 ", hashrate_data[i].y)
+	//console.log("max_hashrate_value22 ", hashrate_data[i].y)
 
     /* get max hashrate data, note - not a BN */
     if (hashrate_data[i].y > max_hashrate_value) {
@@ -526,6 +687,24 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
       max_hashrate_value = hashrate_data[i].y;
     }
   }
+	  // Check if the last value in hashrate_data is 0 and remove it if true
+if (hashrate_data.length > 0 && hashrate_data[hashrate_data.length - 1].y === 0) {
+    hashrate_data.pop();
+}
+	  
+	    var max_rev = 0
+
+  for (var i = 0; i < avgRevenue.length; i += 1) {
+	//console.log("max_rev ", avgRevenue[i].y)
+
+    /* get max hashrate data, note - not a BN */
+    if (avgRevenue[i].y > max_rev) {
+	console.log("max_rev value ", avgRevenue[i].y)
+
+      max_rev = avgRevenue[i].y;
+    }
+  }
+  console.log("difficulty_data: ", difficulty_data);
   var hashrate_based_on_difficulty = max_difficulty_value * _HASHRATE_MULTIPLIER / _IDEAL_BLOCK_TIME_SECONDS;
   var difficulty_based_on_hashrate = max_hashrate_value / ((_HASHRATE_MULTIPLIER) / _IDEAL_BLOCK_TIME_SECONDS);
   if (hashrate_based_on_difficulty > max_hashrate_value) {
@@ -552,12 +731,12 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
             steppedLine: 'before',
             backgroundColor: 'rgb(255, 99, 132)',
             borderColor: 'rgb(255, 99, 132)',
-            data: difficulty_data,
+            data: resultffffff,
             fill: false,
             yAxisID: 'first-y-axis',
 
         },{
-            label: "ABAS Hashrate",
+            label: "zkBitcoin Hashrate",
             showLine: true,
             //steppedLine: 'before',
             backgroundColor: 'rgb(156, 204, 101)',
@@ -581,12 +760,54 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
         }*/]
     },
 
-    options: {
+    options: { 
+	responsive: true, // Enable responsiveness
+    maintainAspectRatio: true, // Disable maintaining aspect ratio
+  
       tooltips: {
         callbacks: {
           label: function(tooltipItem, data) {
             var label = ''
 
+			
+			
+			
+			
+			
+			
+			     const smallScreen5 = window.innerWidth < 868;
+
+      // Conditionally set the tooltip label based on the screen size
+      if (smallScreen5) {
+		  console.log("Small screen tooltip");
+            label += ' (' + ethBlockNumberToTimestamp2(tooltipItem.xLabel) + ') :  ';
+        // Small screen-specific labels
+            if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label +=toReadableThousands(tooltipItem.yLabel)+" zkBitcoin"
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "zkBitcoin Hashrate") {
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label +=toReadableHashrate(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+            /* Note: might have issues here if you dont set dataset label */
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += "ETH Price of 1 zkBTC: "+ (+tooltipItem.yLabel).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label +=  "USD $ Price of 1 zkBTC: "+ (+tooltipItem.yLabel).toFixed(4) + ' $';
+            } else {
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+ " "
+              label += Math.round(tooltipItem.yLabel * 100) / 100;
+            }
+		  
+      } else {
+		  
+	
             /* Note: might have issues here if you dont set dataset label */
             label += data.datasets[tooltipItem.datasetIndex].label
             
@@ -595,15 +816,22 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
 
             if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
               label +=toReadableThousands(tooltipItem.yLabel);
-            }else if (data.datasets[tooltipItem.datasetIndex].label == "ABAS Hashrate") {
-              label +=toReadableHashrate(tooltipItem.yLabel);
-            }else if (data.datasets[tooltipItem.datasetIndex].label == "ABASToken.org Pool Hashrate") {
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "zkBitcoin Hashrate") {
               label +=toReadableHashrate(tooltipItem.yLabel);
             }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
               label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel).toFixed(4) + ' $';
             } else {
               label += Math.round(tooltipItem.yLabel * 100) / 100;
             }
+      }
+			  
+			  
+			
+			
             //console.log(tooltipItem, data)
             return label;
           }
@@ -703,7 +931,322 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
   //console.log('datasetCopy', datasetCopy);
   log('showing graph 2');
   /* block time chart */
-  var rewardtime_chart = new Chart.Scatter(document.getElementById('chart-rewardtime').getContext('2d'), {
+	  
+	  
+	  
+	  var avg_Revenue_chart = new Chart.Scatter(document.getElementById('chart-AvgRevenue').getContext('2d'), {
+    type: 'line',
+
+    data: {
+        datasets: [{
+            label: "24 Hour Revenue @ 31 Gh/s",
+            showLine: true,
+            //steppedLine: 'before',
+            backgroundColor: 'rgb(50,205,50)',
+            borderColor: 'rgb(50,205,50)',
+            data: avgRevenue,
+            fill: false,
+            yAxisID: 'first-y-axis'
+
+        }]
+    },
+
+    options: {
+	responsive: true, // Enable responsiveness
+    maintainAspectRatio: true, // Disable maintaining aspect ratio
+      legend: {
+        //display: false,
+        labels: {
+          /* hide value(s) from the legend */
+          filter: function(legendItem, data) {
+            
+            return legendItem;
+          },
+        },
+      },
+      tooltips: {
+        callbacks: {
+          label: function(tooltipItem, data) {
+            var label = ''
+
+			
+			
+			
+			     const smallScreen = window.innerWidth < 868;
+
+      // Conditionally set the tooltip label based on the screen size
+      if (smallScreen) {
+		  console.log("Small screen tooltip");
+            label += ' (' + ethBlockNumberToTimestamp2(tooltipItem.xLabel) + ') :  ';
+        // Small screen-specific labels
+        if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+          label += toReadableThousands(tooltipItem.yLabel);
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "Network Hashrate") {
+          label += toReadableHashrate(tooltipItem.yLabel);
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+          label += (+tooltipItem.yLabel).toFixed(2) + ' Min';
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "24 Hour Revenue @ 31 Gh/s") {
+          label += "Revenue 24 Hours 31 Gh/s: " + (+tooltipItem.yLabel).toFixed(2) + ' $';
+        } else {
+          label += Math.round(tooltipItem.yLabel * 10000) / 10000;
+        }
+      } else {
+		  
+		  console.log("Large screen tooltip");
+			
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label
+            
+            label += " @ Eth block #" + tooltipItem.xLabel;
+            label += ' (' + ethBlockNumberToTimestamp(tooltipItem.xLabel) + ') :  ';
+		  
+        // Large screen-specific labels
+        if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+          label += toReadableThousands(tooltipItem.yLabel);
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "Network Hashrate") {
+          label += toReadableHashrate(tooltipItem.yLabel);
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+          label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+        } else if (data.datasets[tooltipItem.datasetIndex].label == "24 Hour Revenue @ 31 Gh/s") {
+          label += (+tooltipItem.yLabel).toFixed(2) + ' $';
+        } else {
+          label += Math.round(tooltipItem.yLabel * 10000) / 10000;
+        }
+      }
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+            //console.log(tooltipItem, data)
+            return label;
+          }
+        }
+      },
+      scales: {
+        xAxes: [{
+          gridLines: {
+            color: 'rgb(97, 97, 97)',
+            zeroLineColor: 'rgb(97, 97, 97)',
+          },
+          ticks: {
+            // Include a dollar sign in the ticks
+            callback: function(value, index, values) {
+              return ethBlockNumberToDateStr(value);
+            },
+            //stepSize: 6*((24*60*60)/15),  // 6 days
+          }
+        }],
+        yAxes: [{
+            id: 'first-y-axis',
+            type: 'linear',
+            //type: 'logarithmic',  /* hard to read */
+            scaleLabel: {
+              display: true,
+              labelString: 'Average Price in USD $',
+              fontColor: 'rgb(50,205,50)',
+            },
+            gridLines: {
+              color: 'rgb(97, 97, 97)',
+              zeroLineColor: 'rgb(97, 97, 97)',
+            },
+            ticks: {
+              min: 0,
+              //max: 20,
+              suggestedMax: max_rev,
+              callback: function(value, index, values) {
+                //return value.toFixed(0) + " Minutes";  // correct but looks redundant
+                return value.toFixed(3);
+              },
+            },
+        }]
+      }
+    },
+  });
+	  
+	  
+
+	  
+	  
+	  
+  var rewardtime_chart = new Chart.Scatter(document.getElementById('chart-pricetime').getContext('2d'), {
+    type: 'line',
+
+    data: {
+        datasets: [{
+            label: "Total USD $ Price of 1 zkBTC",
+            showLine: true,
+            //steppedLine: 'before',
+            backgroundColor: 'rgb(50,205,50)',
+            borderColor: 'rgb(50,205,50)',
+            data: avgPriceAtTime,
+            fill: false,
+            yAxisID: 'first-y-axisf'
+
+        },{
+            label: "Total ETH Price of 1 zkBTC",
+            showLine: true,
+            //steppedLine: 'before',
+            backgroundColor: 'rgb(158, 168, 219)',
+            borderColor: 'rgb(158, 168, 219)',
+            data: resultGraph,
+            fill: false,
+            yAxisID: 'second-y-axisf'
+
+        }]
+    },
+
+    options: {
+	responsive: true, // Enable responsiveness
+    maintainAspectRatio: true, // Disable maintaining aspect ratio
+      legend: {
+        //display: false,
+        labels: {
+          /* hide value(s) from the legend */
+          filter: function(legendItem, data) {
+            
+            return legendItem;
+          },
+        },
+      },
+      tooltips: {
+        callbacks: {
+          label: function(tooltipItem, data) {
+            var label = ''
+
+           
+			
+			     const smallScreen2 = window.innerWidth < 868;
+
+      // Conditionally set the tooltip label based on the screen size
+      if (smallScreen2) {
+		  console.log("Small screen tooltip");
+            label += ' (' + ethBlockNumberToTimestamp2(tooltipItem.xLabel) + ') :  ';
+        // Small screen-specific labels
+            if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+              label +=toReadableThousands(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Network Hashrate") {
+              label +=toReadableHashrate(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+              label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += "ETH Price of 1 zkBTC: "+ (tooltipItem.yLabel/scaleFactor).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label +=  "USD $ Price of 1 zkBTC: "+ (+tooltipItem.yLabel).toFixed(4) + ' $';
+            } else {
+              label += Math.round(tooltipItem.yLabel * 10000) / 10000;
+            }
+		  
+      } else {
+		  
+	
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label
+            
+            label += " @ Eth block #" + tooltipItem.xLabel;
+            label += ' (' + ethBlockNumberToTimestamp(tooltipItem.xLabel) + ') :  ';
+
+            if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+              label +=toReadableThousands(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Network Hashrate") {
+              label +=toReadableHashrate(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+              label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel/scaleFactor).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel).toFixed(4) + ' $';
+            } else {
+              label += Math.round(tooltipItem.yLabel * 10000) / 10000;
+            }
+      }
+			
+            //console.log(tooltipItem, data)
+            return label;
+          }
+        }
+      },
+      scales: {
+        xAxes: [{
+          gridLines: {
+            color: 'rgb(97, 97, 97)',
+            zeroLineColor: 'rgb(97, 97, 97)',
+          },
+          ticks: {
+            // Include a dollar sign in the ticks
+            callback: function(value, index, values) {
+              return ethBlockNumberToDateStr(value);
+            },
+            //stepSize: 6*((24*60*60)/15),  // 6 days
+          }
+        }],
+        yAxes: [{
+            id: 'first-y-axisf',
+          position: 'left',
+            type: 'linear',
+            //type: 'logarithmic',  /* hard to read */
+            scaleLabel: {
+              display: true,
+              labelString: 'Average Price in USD $',
+              fontColor: 'rgb(50,205,50)',
+            },
+            gridLines: {
+              color: 'rgb(97, 97, 97)',
+              zeroLineColor: 'rgb(97, 97, 97)',
+            },
+            ticks: {
+              min: 0,
+              //max: 20,
+              suggestedMax: largest$Array,
+              callback: function(value, index, values) {
+                //return value.toFixed(0) + " Minutes";  // correct but looks redundant
+                return value.toFixed(3);
+              },
+            },
+        }, {
+          id: 'second-y-axisf',
+          position: 'right',
+          type: 'linear',
+          //type: 'logarithmic',  /* hard to read */
+          scaleLabel: {
+            display: true,
+            labelString: 'Average Price in ETH',
+            fontColor: 'rgb(158, 168, 219)',
+          },
+          gridLines: {
+            color: 'rgb(97, 97, 97)',
+            zeroLineColor: 'rgb(97, 97, 97)',
+            drawOnChartArea: false, // only want the grid lines for one axis to show up
+          },
+          ticks: {
+            // Include a dollar sign in the ticks
+            
+         suggestedMax: largestETHArray,
+            callback: function(value, index, values) {
+				console.log("Tick: ",value);
+			return (value / scaleFactor).toFixed(8);
+            },
+            //maxTicksLimit: 6,
+            min: 0,
+            autoSkip: true,
+            /*stepSize: 1000,*/
+          }
+        }]
+      }
+    },
+  });
+  var rewardtime_chart2 = new Chart.Scatter(document.getElementById('chart-rewardtime').getContext('2d'), {
     type: 'line',
 
     data: {
@@ -741,6 +1284,8 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
     },
 
     options: {
+	responsive: true, // Enable responsiveness
+    maintainAspectRatio: true, // Disable maintaining aspect ratio
       legend: {
         //display: false,
         labels: {
@@ -756,6 +1301,41 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
           label: function(tooltipItem, data) {
             var label = ''
 
+			
+			
+			
+				
+			     const smallScreen3 = window.innerWidth < 868;
+
+      // Conditionally set the tooltip label based on the screen size
+      if (smallScreen3) {
+		  console.log("Small screen tooltip");
+            label += ' (' + ethBlockNumberToTimestamp2(tooltipItem.xLabel) + ') :  ';
+        // Small screen-specific labels
+            if (data.datasets[tooltipItem.datasetIndex].label == "Total Supply") {
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label +=toReadableThousands(tooltipItem.yLabel)+" zkBitcoin"
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Network Hashrate") {
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label +=toReadableHashrate(tooltipItem.yLabel);
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
+            /* Note: might have issues here if you dont set dataset label */
+            /* Note: might have issues here if you dont set dataset label */
+            label += data.datasets[tooltipItem.datasetIndex].label+" "
+              label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += "ETH Price of 1 zkBTC: "+ (+tooltipItem.yLabel).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label +=  "USD $ Price of 1 zkBTC: "+ (+tooltipItem.yLabel).toFixed(4) + ' $';
+            } else {
+              label += Math.round(tooltipItem.yLabel * 10000) / 10000;
+            }
+		  
+      } else {
+		  
+	
             /* Note: might have issues here if you dont set dataset label */
             label += data.datasets[tooltipItem.datasetIndex].label
             
@@ -768,9 +1348,20 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
               label +=toReadableHashrate(tooltipItem.yLabel);
             }else if (data.datasets[tooltipItem.datasetIndex].label == "Average Reward Time") {
               label += (+tooltipItem.yLabel).toFixed(2) + ' Minutes';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total ETH Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel).toFixed(8) + ' ETH';
+            }else if (data.datasets[tooltipItem.datasetIndex].label == "Total USD $ Price of 1 zkBTC") {
+              label += (+tooltipItem.yLabel).toFixed(4) + ' $';
             } else {
-              label += Math.round(tooltipItem.yLabel * 100) / 100;
+              label += Math.round(tooltipItem.yLabel * 10000) / 10000;
             }
+      }
+			  
+			  
+			  
+			  
+			  
+			  
             //console.log(tooltipItem, data)
             return label;
           }
@@ -793,6 +1384,7 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
         yAxes: [{
             id: 'first-y-axis',
             type: 'linear',
+	    position: 'left',
             //type: 'logarithmic',  /* hard to read */
             scaleLabel: {
               display: true,
@@ -844,6 +1436,9 @@ console.log("max_hashrate_value ", hashrate_data[i].y)
 async function show_progress(value){
   log('updating progress.. (', value, ')');
   el('#difficultystats').innerHTML = '<div class="">Loading info from the blockchain... <span style="font-weight:600;">' + value + '</span></div>';
+  el('#blocktimestats').innerHTML = '<div class="">Loading info from the blockchain... <span style="font-weight:600;">' + value + '</span></div>';
+  el('#priceOverTimestats').innerHTML = '<div class="">Loading info from the blockchain... <span style="font-weight:600;">' + value + '</span></div>';
+  el('#avgRevenue').innerHTML = '<div class="">Loading info from the blockchain... <span style="font-weight:600;">' + value + '</span></div>';
 }
 
 
@@ -867,76 +1462,134 @@ log("last era_values ",era_values)
   var tokens_minted_values = new contractValueOverTime(eth, _CONTRACT_ADDRESS, _TOKENS_MINTED_INDEX, 'tokensMinted');
 
 log("last tokens_minted_values ",tokens_minted_values)
+  var tokens_price_values = new contractValueOverTime(eth, "0x7002d33c756f593ab41af4a236005766e80dc960", 9, 'tokensPrice');
+
+log("last Price_values ",tokens_price_values.getValues)
+  var tokens_price_values2 = new contractValueOverTime(eth, "0x7002d33c756f593ab41af4a236005766e80dc960", 10, 'tokensPrice2');
+  
+  
+log("last tokens_minted_values ",tokens_minted_values)
+  var tokens_price_values3 = new contractValueOverTime(eth, "0x80115c708E12eDd42E504c1cD52Aea96C547c05c", 9, 'tokensPrice3');
+
+log("last Price_values ",tokens_price_values.getValues)
+  var tokens_price_values4 = new contractValueOverTime(eth, "0x80115c708E12eDd42E504c1cD52Aea96C547c05c", 10, 'tokensPrice4');
+
+log("last Price_values ",tokens_price_values.getValues)
+log("last Price_values2 ",tokens_price_values2.getValues)
+log("last Price_values3 ",tokens_price_values3.getValues)
+log("last Price_values4 ",tokens_price_values4.getValues)
   // 'mining target' is at location 11
   var mining_target_values = new contractValueOverTime(eth, _CONTRACT_ADDRESS, _MINING_TARGET_INDEX, 'miningTargets');
 log("last mining_target_values ",mining_target_values.getValues)
 log("last mining_target_values tokens_minted_values ",tokens_minted_values.getValues)
 log("end_eth_block", end_eth_block)
 log("start_eth_block", start_eth_block)
-  last_diff_start_blocks.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
-  era_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
-  tokens_minted_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+ tokens_price_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(500);
 
+tokens_price_values2.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(200);
 
-  // wait on all pending eth log requests to finish (with progress)
-  while(!last_diff_start_blocks.areAllValuesLoaded()) {
-    let numerator = mining_target_values.states.length
-      + tokens_minted_values.states.length
-      + era_values.states.length
-      + last_diff_start_blocks.states.length;
-    let denominator = mining_target_values.expected_state_length
-      + tokens_minted_values.expected_state_length
-      + era_values.expected_state_length
-      + last_diff_start_blocks.expected_state_length;
-    show_progress((70 * (numerator/denominator)).toFixed(0)
-                  + '% ['
-                  + numerator.toFixed(0)
-                  + ' / '
-                  + denominator.toFixed(0)
-                  + ']');
+tokens_price_values3.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(200);
+
+tokens_price_values4.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(200);
+
+last_diff_start_blocks.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(200);
+
+let numerator = 0;
+let denominator = 0;
+
+// wait on all pending eth log requests to finish (with progress)
+while (!last_diff_start_blocks.areAllValuesLoaded() || !tokens_price_values.areAllValuesLoaded() || !tokens_price_values2.areAllValuesLoaded() || !tokens_price_values4.areAllValuesLoaded()) {
+    numerator = tokens_price_values.states.length
+        + tokens_price_values2.states.length
+        + tokens_price_values4.states.length
+        + last_diff_start_blocks.states.length;
+
+    denominator = tokens_price_values.expected_state_length
+        + tokens_price_values2.expected_state_length
+        + tokens_price_values4.expected_state_length
+        + last_diff_start_blocks.expected_state_length;
+
+    show_progress((50 * (numerator / denominator)).toFixed(0)
+        + '% ['
+        + (0.5 * numerator).toFixed(0)
+        + ' / '
+        + denominator.toFixed(0)
+        + ']');
+
     await sleep(1000);
-  }
+}
+
+await sleep(3000);
+
+era_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(500);
+
+tokens_minted_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+await sleep(500);
+
+mining_target_values.addValuesInRange(start_eth_block, end_eth_block, num_search_points);
+
+// wait on all pending eth log requests to finish (with progress)
+while (!mining_target_values.areAllValuesLoaded() || !tokens_minted_values.areAllValuesLoaded() || !era_values.areAllValuesLoaded()) {
+    let numerator2 = mining_target_values.states.length
+        + tokens_minted_values.states.length
+        + era_values.states.length;
+
+    let denominator2 = mining_target_values.expected_state_length
+        + tokens_minted_values.expected_state_length
+        + era_values.expected_state_length;
+
+    show_progress((50 * (numerator2 / denominator2) + 50 * (numerator / denominator)).toFixed(0)
+        + '% ['
+        + (numerator + numerator2).toFixed(0)
+        + ' / '
+        + (denominator + denominator2).toFixed(0)
+        + ']');
+
+    await sleep(1000);
+}
+
   await last_diff_start_blocks.waitUntilLoaded();
-
-  // sort and archive before removing duplicates
+  await mining_target_values.waitUntilLoaded();
+  await tokens_minted_values.waitUntilLoaded();
+  await tokens_minted_values.waitUntilLoaded();
+  await era_values.waitUntilLoaded();
+  await tokens_price_values4.waitUntilLoaded();
+  await tokens_price_values3.waitUntilLoaded();
+  await tokens_price_values2.waitUntilLoaded();
+  await tokens_price_values.waitUntilLoaded();
   last_diff_start_blocks.sortValues();
-  last_diff_start_blocks.saveToLocalStorage();
-
-  /* this operation removes removes duplicate values keeping only the first */
-  last_diff_start_blocks.removeExtraValuesForStepChart();
 
   // Load 'mining target' at each eth block that indicated by the set of
   // latestDifficultyPeriodStarted values
-  let diff_start_block_values = last_diff_start_blocks.getValues;
-  for (var i in diff_start_block_values) {
-    let block_num = diff_start_block_values[i][0].toString(10);
+  /*
+  let diff_start_block_values3 = era_values.getValues;
+  for (var i in diff_start_block_values3) {
+    let block_num = diff_start_block_values3[i][0].toString(10);
 log("start_eth_block block_num", block_num)
-
+last_diff_start_blocks.addValueAtEthBlock(block_num);
     mining_target_values.addValueAtEthBlock(block_num);
+    tokens_price_values.addValueAtEthBlock(block_num);
+    await sleep(10)
+    tokens_price_values2.addValueAtEthBlock(block_num);
+    tokens_price_values3.addValueAtEthBlock(block_num);
+    tokens_price_values4.addValueAtEthBlock(block_num);
+    await sleep(10)
   }
+last_diff_start_blocks.addValueAtEthBlock(end_eth_block);
   mining_target_values.addValueAtEthBlock(end_eth_block);
+    tokens_price_values.addValueAtEthBlock(end_eth_block);
+    tokens_price_values2.addValueAtEthBlock(end_eth_block);
+    tokens_price_values3.addValueAtEthBlock(end_eth_block);
+    tokens_price_values4.addValueAtEthBlock(end_eth_block);
   
-  // wait on all pending eth log requests to finish (with progress)
-  while(!mining_target_values.areAllValuesLoaded()
-        || !tokens_minted_values.areAllValuesLoaded()
-        || !era_values.areAllValuesLoaded()
-        || !last_diff_start_blocks.areAllValuesLoaded()) {
-    let numerator = mining_target_values.states.length
-      + tokens_minted_values.states.length
-      + era_values.states.length
-      + last_diff_start_blocks.states.length;
-    let denominator = mining_target_values.expected_state_length
-      + tokens_minted_values.expected_state_length
-      + era_values.expected_state_length
-      + last_diff_start_blocks.expected_state_length;
-    show_progress((100*(numerator/denominator)).toFixed(0)
-                  + '% ['
-                  + numerator.toFixed(0)
-                  + ' / '
-                  + denominator.toFixed(0)
-                  + ']');
-    await sleep(1000);
-  }
+  */
+
   //await mining_target_values.waitUntilLoaded();
   //await tokens_minted_values.waitUntilLoaded();
   //await era_values.waitUntilLoaded();
@@ -944,14 +1597,30 @@ log("start_eth_block block_num", block_num)
   mining_target_values.sortValues();
   era_values.sortValues();
   tokens_minted_values.sortValues();
-  
+  tokens_price_values.sortValues();
+  tokens_price_values2.sortValues();
+  tokens_price_values3.sortValues();
+  tokens_price_values4.sortValues();
+  // sort and archive before removing duplicates
+  last_diff_start_blocks.sortValues();
+	// Deep copy
+	
+
+	mining_target_values.saveToLocalStorage();
   // TODO: remove this when we are sure it is fixed
   //era_values.deleteLastPointIfZero();
-log("MINING TARGET "+ mining_target_values.getValues);
-  generateHashrateAndBlocktimeGraph(eth, mining_target_values, era_values, tokens_minted_values);
-
+  generateHashrateAndBlocktimeGraph(eth, mining_target_values, era_values, tokens_price_values, tokens_price_values2, tokens_price_values3, tokens_price_values4, tokens_minted_values);
+ document.getElementById('topText').style.display = 'none';
+	
+ document.getElementById('topText2').style.display = 'none';
   era_values.saveToLocalStorage();
+	
+  last_diff_start_blocks.saveToLocalStorage();
   tokens_minted_values.saveToLocalStorage();
+  tokens_price_values.saveToLocalStorage();
+  tokens_price_values2.saveToLocalStorage();
+  tokens_price_values3.saveToLocalStorage();
+  tokens_price_values4.saveToLocalStorage();
   // don't bother with mining_target_values.  it's only a few data points which we can quickly 
   // read from the blockchain.
 
@@ -979,8 +1648,11 @@ function updateGraphData(history_days, num_search_points) {
 
     // ignore value passed in, since we assume 24 hour data intervals in other parts of this code
     num_search_points = history_days;   
-
+	searchPoints2 = num_search_points
     let start_eth_block = (latest_eth_block-max_blocks);
+	  if(start_eth_block<29812049){
+			  start_eth_block = 29812049;
+	  }
   log("latest_eth_block..."+latest_eth_block);
   log("latest_eth_block max_blocks..."+max_blocks);
   log("latest_eth_block...="+(latest_eth_block-max_blocks));
